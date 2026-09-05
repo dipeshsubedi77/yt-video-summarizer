@@ -1,0 +1,6 @@
+{
+  "name": "YouTube Video Summarizer",
+  "description": "AI-powered YouTube video summarizer with transcripts, timestamped chapters, learning flashcards, quiz questions, and interactive video chat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

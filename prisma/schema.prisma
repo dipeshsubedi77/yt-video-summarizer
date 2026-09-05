@@ -1,0 +1,192 @@
+// Prisma Schema for YouTube Video Summarizer
+// Models: User, Video, Transcript, Summary, Chapter, Question, Flashcard, ChatSession, ChatMessage, UserPreference
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum DifficultyLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum SummaryLength {
+  SHORT
+  MEDIUM
+  DETAILED
+}
+
+enum SummaryStyle {
+  SIMPLE
+  ACADEMIC
+  TECHNICAL
+  BEGINNER_FRIENDLY
+  EXAM_FOCUSED
+}
+
+enum QuestionCategory {
+  BASIC
+  INTERMEDIATE
+  ADVANCED
+}
+
+model User {
+  id          String           @id @default(cuid())
+  email       String           @unique
+  name        String?
+  avatarUrl   String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  videos      Video[]
+  preferences UserPreference?
+  chatSessions ChatSession[]
+}
+
+model UserPreference {
+  id              String         @id @default(cuid())
+  userId          String         @unique
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultLength   SummaryLength  @default(MEDIUM)
+  defaultStyle    SummaryStyle   @default(SIMPLE)
+  defaultLanguage String         @default("English")
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Video {
+  id           String         @id @default(cuid())
+  youtubeId    String         @unique
+  url          String
+  title        String
+  channelTitle String
+  channelId    String?
+  durationSec  Int            @default(0)
+  durationText String?
+  thumbnailUrl String
+  publishedAt  String?
+  userId       String?
+  user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  transcript   Transcript?
+  summaries    Summary[]
+  chapters     Chapter[]
+  questions    Question[]
+  flashcards   Flashcard[]
+  chatSessions ChatSession[]
+
+  @@index([youtubeId])
+  @@index([userId])
+}
+
+model Transcript {
+  id        String   @id @default(cuid())
+  videoId   String   @unique
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  language  String   @default("en")
+  isAuto    Boolean  @default(true)
+  rawText   String   @db.Text
+  segments  Json     // Array of { text: string, start: number, duration: number }
+  createdAt DateTime @default(now())
+
+  @@index([videoId])
+}
+
+model Summary {
+  id             String          @id @default(cuid())
+  videoId        String
+  video          Video           @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  length         SummaryLength   @default(MEDIUM)
+  style          SummaryStyle    @default(SIMPLE)
+  language       String          @default("English")
+  difficulty     DifficultyLevel @default(INTERMEDIATE)
+  tldr           String          @db.Text
+  keyTakeaways   Json            // string[]
+  detailedSummary Json           // Array of { title: string, content: string, keyPoints?: string[] }
+  importantConcepts Json         // Array of { term: string, definition: string, context?: string }
+  actionItems    Json            // string[]
+  keyQuotes      Json            // Array of { quote: string, timestamp?: string, speaker?: string }
+  keywords       Json            // string[]
+  createdAt      DateTime        @default(now())
+
+  @@index([videoId])
+}
+
+model Chapter {
+  id        String   @id @default(cuid())
+  videoId   String
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  title     String
+  startTime Int      // In seconds
+  timestamp String   // e.g. "04:12"
+  summary   String?  @db.Text
+  keyPoints Json?    // string[]
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([videoId])
+}
+
+model Question {
+  id          String           @id @default(cuid())
+  videoId     String
+  video       Video            @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  category    QuestionCategory @default(INTERMEDIATE)
+  question    String           @db.Text
+  answer      String           @db.Text
+  explanation String           @db.Text
+  timestamp   String?
+  createdAt   DateTime         @default(now())
+
+  @@index([videoId])
+}
+
+model Flashcard {
+  id          String   @id @default(cuid())
+  videoId     String
+  video       Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  front       String   @db.Text
+  back        String   @db.Text
+  concept     String?
+  isDifficult Boolean  @default(false)
+  repetitions Int      @default(0)
+  interval    Int      @default(1)
+  easeFactor  Float    @default(2.5)
+  nextReview  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([videoId])
+}
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  videoId   String
+  video     Video         @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  title     String?
+  createdAt DateTime      @default(now())
+  messages  ChatMessage[]
+
+  @@index([videoId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id          String      @id @default(cuid())
+  sessionId   String
+  session     ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role        String      // "user" | "assistant"
+  content     String      @db.Text
+  citations   Json?       // Array of { timestamp: string, text: string, seconds: number }
+  createdAt   DateTime    @default(now())
+
+  @@index([sessionId])
+}
